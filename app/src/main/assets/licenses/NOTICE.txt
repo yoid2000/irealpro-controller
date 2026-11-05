@@ -1,0 +1,26 @@
+VoiceKeys
+
+This app bundles the following open-source components:
+
+sherpa-onnx 2.0.1 — Apache License 2.0
+https://github.com/k2-fsa/sherpa-onnx
+Copyright (c) 2022-2026 by sherpa-onnx authors.
+
+X-ASR 160 ms Chinese/English streaming model, quantized export dated 2026-06-05
+Apache License 2.0
+https://github.com/Gilgamesh-J/X-ASR
+Model distributed by the sherpa-onnx asr-models release.
+
+AndroidX / Jetpack Compose — Apache License 2.0
+Copyright The Android Open Source Project.
+https://github.com/androidx/androidx
+
+Kotlin standard library 2.1.20 — Apache License 2.0
+Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
+https://github.com/JetBrains/kotlin
+
+ONNX Runtime — MIT License
+Copyright (c) Microsoft Corporation. All rights reserved.
+https://github.com/microsoft/onnxruntime
+
+Full Apache 2.0 and ONNX Runtime license texts follow.

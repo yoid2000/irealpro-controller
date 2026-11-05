@@ -1,0 +1,12 @@
+.gradle/
+.kotlin/
+**/build/
+local.properties
+.tools/
+.downloads/
+app/libs/*.aar
+app/src/main/assets/kws/*
+!app/src/main/assets/kws/.gitkeep
+*.jks
+*.keystore
+__pycache__/
