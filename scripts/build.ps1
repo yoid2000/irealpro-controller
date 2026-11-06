@@ -22,6 +22,8 @@ try {
     $sdkPath = $env:ANDROID_HOME.Replace('\', '/').Replace(':', '\:')
     [System.IO.File]::WriteAllText((Join-Path $root 'local.properties'), ('sdk.dir=' + $sdkPath + "`n"), [System.Text.Encoding]::ASCII)
     if (!$SkipAssetDownload) {
+        & python -m pip install -r scripts/requirements-assets.txt
+        if ($LASTEXITCODE -ne 0) { throw 'Asset preparation dependency installation failed.' }
         & python scripts/prepare_assets.py
         if ($LASTEXITCODE -ne 0) { throw 'Asset download failed.' }
     }

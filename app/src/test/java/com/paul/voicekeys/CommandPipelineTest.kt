@@ -8,7 +8,7 @@ class CommandPipelineTest {
         val queue = KeyPacingQueue()
         defaultMappings().take(4).forEach { queue.enqueue(it.key) }
         val sent = mutableListOf<OutputKey>()
-        for (time in listOf(0L, 250L, 500L, 750L)) {
+        for (time in listOf(0L, 200L, 400L, 600L)) {
             assertEquals(0L, queue.waitMillis(time))
             sent += queue.take(time)
         }
@@ -16,10 +16,10 @@ class CommandPipelineTest {
         assertNull(queue.waitMillis(1000))
     }
 
-    @Test fun normalFourPerSecondCadenceDoesNotAccumulateDelay() {
+    @Test fun normalFivePerSecondCadenceDoesNotAccumulateDelay() {
         val queue = KeyPacingQueue()
         repeat(40) { i ->
-            val now = i * 250L
+            val now = i * 200L
             queue.enqueue(OutputKey.COMMA)
             assertEquals(0L, queue.waitMillis(now))
             queue.take(now)
@@ -42,8 +42,8 @@ class CommandPipelineTest {
         assertEquals(0L, queue.waitMillis(140))
         queue.take(140)
         queue.enqueue(OutputKey.COMMA)
-        assertEquals(170L, queue.waitMillis(180))
-        assertEquals(OutputKey.COMMA, queue.take(350))
+        assertEquals(120L, queue.waitMillis(180))
+        assertEquals(OutputKey.COMMA, queue.take(300))
     }
 
     @Test fun stoppingDiscardsQueuedKeysWithoutBypassingCommaSpacing() {
@@ -53,8 +53,8 @@ class CommandPipelineTest {
         queue.clear()
         assertNull(queue.waitMillis(101))
         queue.enqueue(OutputKey.COMMA)
-        assertEquals(249L, queue.waitMillis(101))
-        assertEquals(OutputKey.COMMA, queue.take(350))
+        assertEquals(199L, queue.waitMillis(101))
+        assertEquals(OutputKey.COMMA, queue.take(300))
     }
 
     @Test fun fifoDoesNotLetStopOvertakePendingCountingWords() {
@@ -63,9 +63,9 @@ class CommandPipelineTest {
         queue.enqueue(OutputKey.COMMA)
         queue.enqueue(OutputKey.SPACE)
         assertEquals(OutputKey.COMMA, queue.take(0))
-        assertEquals(210L, queue.waitMillis(40))
-        assertEquals(OutputKey.COMMA, queue.take(250))
-        assertEquals(OutputKey.SPACE, queue.take(290))
+        assertEquals(160L, queue.waitMillis(40))
+        assertEquals(OutputKey.COMMA, queue.take(200))
+        assertEquals(OutputKey.SPACE, queue.take(240))
     }
 
     @Test fun excessiveBacklogFailsExplicitly() {

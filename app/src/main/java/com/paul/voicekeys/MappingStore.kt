@@ -6,6 +6,13 @@ import org.json.JSONObject
 
 class MappingStore(context: Context) {
     private val prefs = context.getSharedPreferences("voicekeys", Context.MODE_PRIVATE)
+    var recognitionMode: RecognitionMode
+        get() = runCatching { RecognitionMode.valueOf(prefs.getString("recognitionMode", null) ?: "TRAINED_SOUNDS") }
+            .getOrDefault(RecognitionMode.TRAINED_SOUNDS)
+        set(value) { prefs.edit().putString("recognitionMode", value.name).apply() }
+    var commandBias: Boolean
+        get() = prefs.getBoolean("commandBias", true)
+        set(value) { prefs.edit().putBoolean("commandBias", value).apply() }
     var useBleKeyboard: Boolean
         get() = prefs.getBoolean("bleKeyboard", false)
         set(value) { prefs.edit().putBoolean("bleKeyboard", value).apply() }
@@ -25,7 +32,7 @@ class MappingStore(context: Context) {
                 val item = array.getJSONObject(i)
                 CommandMapping(item.getString("id"), validateWord(item.getString("word")),
                     OutputKey.valueOf(item.getString("key")),
-                    item.optDouble("threshold", 0.5).toFloat().coerceIn(0.15f, 0.9f))
+                    item.optDouble("threshold", 0.2).toFloat().coerceIn(0.15f, 0.9f))
             }.also { items -> require(items.map { it.word }.distinct().size == items.size) }
         }.getOrElse { defaultMappings() }
     }

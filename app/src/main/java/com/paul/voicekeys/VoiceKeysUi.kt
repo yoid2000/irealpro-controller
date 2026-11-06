@@ -47,6 +47,7 @@ fun VoiceKeysApp(app: MainActivity) {
                 }
                 when (tab) {
                     0 -> {
+                        RecognitionModePicker(app)
                         Panel("Voice control") {
                             Text(app.status)
                             Button(onClick = {
@@ -65,16 +66,63 @@ fun VoiceKeysApp(app: MainActivity) {
                         }
                         Panel("Practice with your violin") {
                             Text("Check for music-only false detections, then speak while playing. Practice sends no keys.")
+                            if (app.recognitionMode == RecognitionMode.SPEECH) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Switch(checked = app.commandBias, onCheckedChange = app::changeCommandBias,
+                                    enabled = app.sessionKind == null)
+                                Text("Favour command words", Modifier.padding(start = 8.dp))
+                            }
+                            Text(if (app.commandBias) "Command bias is on for both Practice and voice control."
+                                else "Original recognition is selected for comparison.", style = MaterialTheme.typography.bodySmall)
+                            } else Text("Trained sounds compare your acoustic examples directly. Train the four sounds and violin background under Commands.")
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Switch(checked = app.recordNextPractice, onCheckedChange = app::changeRecordNextPractice,
+                                    enabled = app.sessionKind == null)
+                                Text("Record next Practice (30 seconds max)", Modifier.padding(start = 8.dp))
+                            }
+                            Text("Optional: keep the actual headset input in memory so you can listen for missing word beginnings. Stop Practice to play or export it. Nothing is uploaded.",
+                                style = MaterialTheme.typography.bodySmall)
                             OutlinedButton(onClick = {
                                 if (app.sessionKind == SessionKind.PRACTICE) app.stopSession()
                                 else { app.stopSession(); app.startSession(SessionKind.PRACTICE) }
-                            }, enabled = app.sessionKind != SessionKind.ENROLL) {
+                            }, enabled = app.sessionKind == null || app.sessionKind == SessionKind.PRACTICE) {
                                 Text(if (app.sessionKind == SessionKind.PRACTICE) "Stop practice" else "Start practice")
                             }
                             Text("Since clear — detected: ${app.detectedCount}    Keys sent: ${app.sentCount}")
+                            if (app.recordingActive) Text("Recorded: ${String.format(Locale.ROOT, "%.1f", app.recordedSeconds)} / 30 seconds. Practice continues after the recording limit.")
                             if (app.lastSent.isNotBlank()) Text("Last key sent: ${app.lastSent}")
-                            Text("Each comma is spaced at least 250 ms apart. No command sequence is filled in automatically.",
+                            Text("Each comma is spaced at least 200 ms apart. No command sequence is filled in automatically.",
                                 style = MaterialTheme.typography.bodySmall)
+                        }
+                        Panel(if (app.recognitionMode == RecognitionMode.TRAINED_SOUNDS) "Sound matches" else "What recognition heard") {
+                            Text(app.heardText.ifBlank { "No detections yet. Start Practice and wait for the ready message." })
+                            Text(if (app.recognitionMode == RecognitionMode.TRAINED_SOUNDS)
+                                "No words are transcribed. Lower sound distance means a closer match; ambiguous matches and matches resembling violin are rejected. Ordinary nonmatches are silent."
+                                else "This transcript may change. Word decisions below explain acceptance or rejection; a missing word may be absent from the transcript too.",
+                                style = MaterialTheme.typography.bodySmall)
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                TextButton(onClick = app::clearPractice) { Text("Clear practice") }
+                                TextButton(onClick = app::exportPractice, enabled = app.practiceEntries.isNotEmpty()) { Text("Export diagnostics") }
+                            }
+                            app.practiceEntries.filter { it.type == "word" }.take(15).forEach { entry ->
+                                Text("${entry.at}  ${entry.text.ifBlank { "Recognition changed" }} — ${entry.outcome}",
+                                    style = MaterialTheme.typography.bodyMedium)
+                                if (entry.score != null) Text("Score ${String.format(Locale.ROOT, "%.3f", entry.score)}" +
+                                    (entry.threshold?.let { "; selectivity ${String.format(Locale.ROOT, "%.2f", it)}" } ?: ""),
+                                    style = MaterialTheme.typography.bodySmall)
+                                if (entry.distance != null) Text("Distance ${String.format(Locale.ROOT, "%.3f", entry.distance)}; limit ${String.format(Locale.ROOT, "%.3f", entry.distanceLimit)}",
+                                    style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                        if (app.recordedInput != null) Panel("Recorded headset input · Practice ${app.recordedSession}") {
+                            Text("${String.format(Locale.ROOT, "%.1f", app.recordedSeconds)} seconds, 16 kHz mono. Kept until discarded, replaced, or this screen is recreated. Playback volume follows media volume.")
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                TextButton(onClick = app::playRecording, enabled = app.sessionKind == null) {
+                                    Text(if (app.playingRecording) "Stop playback" else "Play")
+                                }
+                                TextButton(onClick = app::exportRecording, enabled = app.sessionKind == null) { Text("Export WAV") }
+                                TextButton(onClick = app::discardRecording, enabled = app.sessionKind == null) { Text("Discard") }
+                            }
                         }
                         Panel("Recent detections") {
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -89,6 +137,8 @@ fun VoiceKeysApp(app: MainActivity) {
                         }
                     }
                     1 -> {
+                        RecognitionModePicker(app)
+                        if (app.recognitionMode == RecognitionMode.TRAINED_SOUNDS) TrainedSoundCommands(app) else {
                         Text("Programmable commands", style = MaterialTheme.typography.titleLarge)
                         Text("Higher selectivity rejects more uncertain matches, but can miss quiet commands. Tune while playing the violin.")
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -109,6 +159,7 @@ fun VoiceKeysApp(app: MainActivity) {
                         }
                         Text("Supported: up to nine English single-word commands. Speaking a word suggests its spelling; confirm or correct it before saving.",
                             style = MaterialTheme.typography.bodySmall)
+                        }
                     }
                     2 -> {
                         Panel("1 · Headset on device A") {
@@ -159,7 +210,7 @@ fun VoiceKeysApp(app: MainActivity) {
                                 style = MaterialTheme.typography.bodySmall)
                         }
                         Panel("Offline by design") {
-                            Text("Recognition stays on device A. The app has no internet permission, stores mappings locally, and does not retain microphone recordings. The detection log is kept only for this app session unless you export it.")
+                            Text("Recognition stays on device A with no internet permission. Sound training stores acoustic features privately on A; enrollment audio is discarded after review. Optional Practice recordings last up to 30 seconds. Playback uses a temporary private cache file. Only explicit export saves audio elsewhere.")
                             TextButton(onClick = {
                                 licenseText = listOf("NOTICE.txt", "Apache-2.0.txt", "ONNX-Runtime.txt").joinToString("\n\n") {
                                     app.assets.open("licenses/$it").bufferedReader().use { reader -> reader.readText() }
@@ -176,6 +227,7 @@ fun VoiceKeysApp(app: MainActivity) {
                 app.dismissEnrollment()
             }
         }
+        app.soundAudio?.let { SoundCaptureDialog(app, it) }
         edit?.let { mapping ->
             MappingDialog(mapping, onDismiss = { edit = null },
                 onSave = { app.saveMapping(it) { edit = null } },
@@ -196,7 +248,7 @@ fun VoiceKeysApp(app: MainActivity) {
 }
 
 @Composable
-private fun Panel(title: String, content: @Composable ColumnScope.() -> Unit) {
+fun Panel(title: String, content: @Composable ColumnScope.() -> Unit) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
@@ -228,7 +280,7 @@ private fun MappingDialog(initial: CommandMapping, onDismiss: () -> Unit,
 }
 
 @Composable
-private fun KeyDialog(onDismiss: () -> Unit, onSelect: (OutputKey) -> Unit) {
+fun KeyDialog(onDismiss: () -> Unit, onSelect: (OutputKey) -> Unit) {
     AlertDialog(onDismissRequest = onDismiss, title = { Text("Select output key") }, text = {
         Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
             OutputKey.entries.forEach { key ->

@@ -1,9 +1,10 @@
-"""Fetch pinned upstream binaries. Python 3.10+, standard library only."""
+"""Fetch pinned upstream binaries; install requirements-assets.txt first."""
 from pathlib import Path
 import hashlib
 import shutil
 import tarfile
 import urllib.request
+import sentencepiece as spm
 
 ROOT = Path(__file__).resolve().parents[1]
 CACHE = ROOT / ".downloads"
@@ -45,6 +46,13 @@ def prepare():
                 raise RuntimeError(f"Expected a regular file: {source}")
             with archive.extractfile(member) as incoming, (assets / destination).open("wb") as out:
                 shutil.copyfileobj(incoming, out)
+        with archive.extractfile(archive.getmember(f"{MODEL}/bpe.model")) as incoming:
+            tokenizer = spm.SentencePieceProcessor(model_proto=incoming.read())
+        # The native contextual-bias encoder consumes the vocabulary and scores,
+        # not the binary SentencePiece model. Derive it from the verified archive.
+        (assets / "bpe.vocab").write_text("".join(
+            f"{tokenizer.id_to_piece(i)}\t{tokenizer.get_score(i)}\n"
+            for i in range(tokenizer.get_piece_size())), encoding="utf-8")
     print("Offline recognition assets ready.")
 
 

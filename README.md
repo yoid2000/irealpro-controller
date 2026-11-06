@@ -16,7 +16,9 @@ tested Moto firmware, permissions are granted but Android does not expose the
 classic HID Device service. BLE publishes the standard keyboard service through
 GATT instead. No extra microphone or Bluetooth permission is needed.
 
-Version **0.1.4** has been tested on the Moto with a Samsung Tab S10 FE as B:
+The current build is **0.3.0**, with personalized **Trained sounds** recognition
+and **200 ms** comma spacing. Install it as an update to retain your speech mappings, selectivity and
+Bluetooth settings. Version **0.1.4** was tested on the Moto with a Samsung Tab S10 FE as B:
 BLE pairing and a Comma test key succeeded. Keep VoiceKeys visible on A; its
 screen stays awake while the BLE keyboard is active. See
 [the validation record](docs/VALIDATION.md) for the remaining voice/violin tests.
@@ -91,8 +93,9 @@ The app does not change A's global Bluetooth name.
 5. Focus a text field on B. Use **Send a test key** to verify comma, space and
    period. Check B's physical keyboard layout if punctuation differs. Then open
    the app to be controlled on B and verify its shortcuts.
-6. On A's **Control** tab, turn voice control on. Wait until the status says
-   **Listening** before speaking. The first model load can take several seconds.
+6. Train the sounds as described below, then use **Practice**. On A's **Control**
+   tab, turn voice control on only when ready. Wait for **Listening** before
+   speaking. Speech recognition remains available as a separate mode.
 
 If B does not show keyboard capability, close other remote-keyboard apps on A,
 return to VoiceKeys, and check registration. If necessary, forget/re-pair A on B
@@ -135,7 +138,87 @@ listening or while its BLE keyboard is active and visible, including pairing
 and test-key use. If B disconnects, or the actual microphone route stops being the
 selected headset, voice control stops. No commands are replayed on reconnect.
 
-## Commands
+## Trained sounds: first setup (0.3.0)
+
+**Trained sounds** is selected by default after this update. It compares your
+acoustic examples directly; it does not transcribe words, use a dictionary or
+wait for a following word. The old speech mode and its settings are retained.
+
+The four slots start with the following trial sounds; labels and output keys
+are editable under **Commands → Edit**:
+
+| Sound label | How to say it | Default key |
+| --- | --- | --- |
+| BAP | Rhymes with cap | comma `,` |
+| DEET | Rhymes with feet | Space |
+| GOKE | Rhymes with coke, starting with a hard G | Space |
+| SHOOM | Rhymes with boom | period `.` |
+
+DEET and GOKE serve the original start/stop actions, both of which send Space.
+GOKE replaces the earlier GO suggestion because its ending gives a more
+distinctive pattern in the synthetic comparisons. These are starting candidates,
+not a claim that they are optimal for your voice or violin.
+
+1. Connect and select the Shokz headset under **Connections**, then open
+   **Commands** with **Trained sounds** selected. Start with BAP if you want to
+   try one sound before completing all four.
+2. Without violin, tap **Record one example**. Wait for **Make BAP ONCE now**
+   (or the chosen label), then make the sound once. Recording ends automatically
+   after three seconds; microphone setup time is excluded.
+3. In **Review sound example**, use **Play selection** and the two slider handles
+   to keep the complete utterance, including its consonants, while excluding
+   surrounding silence. Select 100–1,200 ms, then tap **Use example**. Discard and
+   retry if the sound is obscured or its beginning is missing.
+4. Save at least **five examples per sound**; aim for 8–12 with natural changes in
+   pitch, loudness and speed. Include short, quick BAPs for rapid use. A label is
+   only a name: you can teach a nonsense sound. Changing the label does not
+   replace its training; use **Clear this sound's training** before changing the
+   actual utterance. **Remove last** removes the latest example.
+5. Under **Violin-only background**, tap **Record violin · 10 seconds**. Play
+   throughout without speaking, including bow changes and different registers.
+   Add another passage for more variety. The bounded feature bank retains
+   examples from earlier passages as well as the new one.
+6. Open **Control → Start practice**. One sound with five examples plus violin
+   background is enough for Practice. Test fresh utterances both without and
+   with violin. Test BAP repetitions up to **five per second**; leave at least a
+   second between the other commands, matching the intended use. Also test a
+   held sound: it should count once. Compare the exact occurrence counts.
+7. Play violin alone for several minutes in Practice and watch for false
+   detections. Practice sends no keys. Optionally record the first 30 seconds
+   for playback/export using **Record next Practice**.
+8. When all four slots have at least five examples and the violin background is
+   recorded, voice control can be enabled. First test into a blank text field
+   on B. Each accepted BAP produces one comma, with at least **200 ms** between
+   comma key-downs. Other detected occurrences are also separate keypresses.
+
+**Sound matches** shows the closest plausible match and why it was accepted or
+rejected. Smaller distance is a closer match; the learned limit is based on
+variation among your examples. Matches too similar to another sound or recorded
+violin are rejected. Ordinary nonmatches do not generate log rows. Distances
+are not probabilities. **Export diagnostics** includes distance, limit, competing
+sound distance and violin distance; infinity means no duration-compatible
+comparison was available. Its lookback is not measured microphone-to-key latency.
+
+In **Commands → Edit**, **Match tolerance** is separate from speech selectivity:
+**higher tolerance accepts more variation; lower tolerance is stricter**. Start
+at 1.00×. If a command is missed, try better examples (including the speed you
+actually use) before increasing tolerance. Recheck violin-only rejection after
+every change. If two sounds are confused, choose a different utterance rather
+than relying only on tolerance.
+
+Training stores acoustic features privately on A and survives app restarts.
+Use the same headset for training and control; a different microphone may
+require retraining.
+Enrollment audio is held only for review and discarded after saving/discarding;
+playback uses the same disposable private cache as Practice playback. No sound
+model or enrollment audio is uploaded. Uninstalling the app removes its training.
+This is an experimental template matcher; your real headset/violin results,
+including rapid BAP accuracy and delay, still need validation.
+
+## Speech commands (previous recognition mode)
+
+Select **Speech recognition (previous mode)** under Control or Commands to use
+the original mappings and diagnostics described below.
 
 | Spoken command | One keypress |
 | --- | --- |
@@ -149,7 +232,7 @@ selected headset, voice control stops. No commands are replayed on reconnect.
 
 Every detected occurrence is handled separately. Continuous “one two three four”
 can produce four commas without silence between words. Comma key-down reports
-are spaced at least **250 ms apart**. A short FIFO preserves batched detections;
+are spaced at least **200 ms apart**. A short FIFO preserves batched detections;
 it does not discard them through a cooldown or invent missing counts. Each key
 is released after 25 ms. Start and stop both send Space, regardless of B's
 playback state.
@@ -161,19 +244,62 @@ Mappings and selectivity settings persist locally. Supported keys include
 punctuation, Space, letters, digits, arrows, Enter, Escape, Tab and Backspace;
 letters refer to unshifted physical key positions.
 
-## Violin calibration
+## Speech recognition diagnostics (introduced in 0.2.0)
+
+**Favour command words** is on by default and applies to Practice and voice
+control. It gives your configured words extra weight during recognition; it
+does not train a model to your voice or force every sound into a command. Stop
+listening before changing it. Turn it off to compare the original recognizer
+using the same words and selectivity values. Your existing values are preserved;
+new installations default to 0.20, with four and pause at 0.15.
+
+To investigate missed words:
+
+1. Under **Control → Practice with your violin**, enable **Record next Practice**
+   if you want to listen to the actual headset input. Recording is optional and
+   applies only to the next Practice session, never voice control.
+2. Start Practice and wait for the ready message. In the first 30 seconds, say
+   **four**, **pause** and **stop** several times with short gaps, then say
+   **one two three four** twice. Use a separate session for speech with violin,
+   and another for violin alone. Note what you intended to say for each session.
+3. Watch **What recognition heard**. The transcript is a changing hypothesis,
+   not a verbatim recording. Word decisions show **Accepted**, **Below
+   selectivity**, **Not a command**, or unavailable/invalid scores. For example,
+   a recognized “for” is shown as **Not a command** rather than silently lost.
+   Missing transcript words alone do not prove that microphone audio was missing.
+4. Stop Practice. If you recorded it, tap **Play** and listen for missing word
+   beginnings. This is the exact 16 kHz PCM input supplied to the recognizer
+   after verifying the Bluetooth microphone route. It includes any processing
+   already applied by the headset and Android.
+5. Use **Export diagnostics** for transcript changes and word decisions, and
+   **Export WAV** for the optional recording. Diagnostics include the Practice
+   session number, decoder mode, audio offsets, acoustic score and selectivity.
+   The log holds the latest 1,000 entries. Only the first 30 seconds are recorded;
+   Practice continues normally after the recording limit.
+6. Repeat with **Favour command words** off, keeping selectivity unchanged. Use
+   fresh examples, including continuous counting, to compare missed commands,
+   unwanted commands and response time. Biased decoding can still miss words.
+
+Practice recordings stay in memory until discarded, replaced by another recording, or
+the activity is recreated. Playback temporarily writes a private cache WAV,
+which is removed when playback stops or VoiceKeys next opens. Only explicit
+export saves a recording to your chosen location. Starting Practice or leaving
+the app stops playback. Practice audio is recorded only when the switch is enabled;
+sound-enrollment and violin-training buttons explicitly start their own short captures.
+
+## Speech mode violin calibration
 
 1. Select **Practice**, which uses the same recognition path but sends no keys.
 2. Clear the log and play violin without speaking for several minutes, including
    loud passages, all registers, bow changes, and normal head movement. Look for
    unwanted detections.
 3. Speak each command while playing, then try repeated counting sequences at up
-   to four words per second. Compare the exact number of detections with what
+   to five words per second. Compare the exact number of detections with what
    you said. Test individual repeated commands too; speech models can omit words.
 4. Under **Commands → Edit**, raise a word's selectivity to reject more uncertain
    matches; lower it if commands are missed. Repeat steps 2–3 on a different
    passage. Adjust the headset fit if violin is overwhelming your voice.
-5. Export the CSV when useful. It contains accepted detections and approximate
+5. The **Recent detections → Export CSV** log contains accepted detections and approximate
    decoder lookback, **not measured microphone-to-key latency**. Clearing the log
    resets counters; recreating the activity loses the in-memory log.
 
@@ -183,9 +309,10 @@ rejection. There is no forced nearest-command fallback. Unknown words, missing
 scores and low-scoring words send nothing. The headset's own noise cancellation
 is used as delivered by Android; the app does not assume it removes violin.
 
-No internet permission, background microphone service, recording storage, or
-cloud recognizer is used. Audio is processed in memory and discarded. Only
-mappings/settings are saved; CSV export is an explicit user action.
+No internet permission, background microphone service or cloud recognizer is
+used. Normal voice control retains no audio. Training retains acoustic features;
+optional Practice recordings and exports behave as described above. Mappings
+and settings are saved locally.
 
 ## Build
 
@@ -193,6 +320,7 @@ Requirements: JDK 17, Python 3.10+, Android SDK platform 36, and network access 
 the initial dependency downloads. Open the project in Android Studio or run:
 
 ```powershell
+python -m pip install -r scripts/requirements-assets.txt
 python scripts/prepare_assets.py
 .\gradlew.bat :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
 ```
@@ -208,17 +336,35 @@ must run asset preparation before building. CI runs unit tests, lint, an APK
 build and a native-library alignment check. Add `-PincludeEmulator=true` to also
 include x86_64 native libraries for emulator development.
 
+With a USB-debugging Android device connected, run
+`.\gradlew.bat :app:connectedDebugAndroidTest` to exercise the bundled native
+recognizer and Kotlin matcher using synthetic test audio. This test does not
+open the microphone or send keyboard input; it does not replace headset testing.
+
 ## Implementation and validation
 
 - Kotlin / Jetpack Compose; Android's Bluetooth HID device API with a keyboard
   SDP record, report descriptor, press/release reports, and boot/report handling.
 - Android communication-device selection plus verification of the actual
   `AudioRecord` input route. Audio capture is 16 kHz mono PCM in 20 ms blocks.
-- Offline sherpa-onnx with the quantized X-ASR 160 ms streaming model. This
+- Trained sounds: normalized 13-dimensional MFCC features from 25 ms windows at
+  10 ms steps, matched by streaming subsequence dynamic time warping. A 30 ms
+  settling interval commits local matches. Acoustic onsets rearm recognition;
+  elapsed time alone does not retrigger a held sound. Negative examples span
+  100, 200, 400 and 800 ms, including short violin transients for BAP comparison.
+  Fixed memory bounds and per-session model snapshots keep capture bounded.
+  This path does not initialize the ASR model. It uses no neural-network training.
+- Speech mode: offline sherpa-onnx with the quantized X-ASR 160 ms streaming model. This
   model is larger than the tiny keyword model because that model failed adjacent
-  short-command tests. A greedy continuous decoder preserves emitted token
-  positions. Whole-word matching, per-word acoustic rejection and a brief final
-  word stabilization step convert its output into command occurrences.
+  short-command tests. Modified beam search with four active paths favours the
+  configured commands (hotword score 0.5); a switch retains the original greedy
+  decoder for comparison. The bias tokenizer vocabulary is derived from the
+  pinned model archive. Matching uses whole words, per-word acoustic rejection
+  and 120 ms of stable prefix output, including adjacent words in beam mode.
+  A revision of already committed output restarts the decoder segment without
+  replaying keys. Unknown words are never assigned to the nearest command.
+- A 1.6-second nonempty-segment silence allowance avoids resetting before
+  delayed words emerge. Accepted words do not wait for this silence timeout.
 - The model's **160 ms chunk size is not an end-to-end latency guarantee**.
   Recognition can return multiple words per chunk. Bluetooth transport,
   stabilization, CPU speed and comma pacing add delay. A processing lag over

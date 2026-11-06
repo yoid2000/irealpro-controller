@@ -26,7 +26,7 @@ data class CommandMapping(
     val id: String = UUID.randomUUID().toString(),
     val word: String,
     val key: OutputKey,
-    val threshold: Float = 0.5f,
+    val threshold: Float = 0.2f,
 )
 
 fun normalizeWord(input: String): String = Normalizer.normalize(input, Normalizer.Form.NFKC)
@@ -46,7 +46,7 @@ fun defaultMappings(): List<CommandMapping> = listOf(
     "three" to OutputKey.COMMA, "four" to OutputKey.COMMA,
     "start" to OutputKey.SPACE, "stop" to OutputKey.SPACE, "pause" to OutputKey.PERIOD,
 ).map { (word, key) -> CommandMapping(id = word, word = word, key = key,
-    threshold = if (word == "pause") 0.4f else 0.5f) }
+    threshold = if (word == "pause" || word == "four") 0.15f else 0.2f) }
 
 /** FIFO scheduling preserves every occurrence, including repeated identical words. */
 class KeyPacingQueue {
@@ -63,7 +63,7 @@ class KeyPacingQueue {
     fun waitMillis(now: Long): Long? {
         val key = queue.firstOrNull() ?: return null
         val releaseReady = lastKeyAt?.plus(40) ?: now
-        val commaReady = if (key == OutputKey.COMMA) lastCommaAt?.plus(250) ?: now else now
+        val commaReady = if (key == OutputKey.COMMA) lastCommaAt?.plus(200) ?: now else now
         return (maxOf(releaseReady, commaReady) - now).coerceAtLeast(0)
     }
 

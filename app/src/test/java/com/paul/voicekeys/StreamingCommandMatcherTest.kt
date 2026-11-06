@@ -72,4 +72,72 @@ class StreamingCommandMatcherTest {
         assertEquals(1, matcher.accept(listOf(" GO"), scores(1), FloatArray(1), 0, true).size)
         assertTrue(matcher.accept(listOf(" GO", "ING"), scores(2), FloatArray(2), 320, true).isEmpty())
     }
+
+    @Test fun beamCanReviseAnUncommittedGuessThenAcceptStableCommand() {
+        val matcher = StreamingCommandMatcher(defaultMappings(), revisable = true)
+        assertTrue(matcher.accept(listOf(" FOR"), scores(1), FloatArray(1), 0).isEmpty())
+        assertTrue(matcher.accept(listOf(" FOUR"), scores(1), FloatArray(1), 160).isEmpty())
+        assertEquals(listOf("four"), matcher.accept(listOf(" FOUR"), scores(1), FloatArray(1), 320).map { it.word })
+    }
+
+    @Test fun beamPreservesAdjacentAndRepeatedOccurrencesAfterPrefixStabilizes() {
+        val matcher = StreamingCommandMatcher(defaultMappings(), revisable = true)
+        val tokens = listOf(" ONE", " TWO", " THREE", " FOUR", " FOUR")
+        assertTrue(matcher.accept(tokens, scores(5), FloatArray(5), 0).isEmpty())
+        assertEquals(listOf("one", "two", "three", "four", "four"),
+            matcher.accept(tokens, scores(5), FloatArray(5), 160).map { it.word })
+        assertTrue(matcher.accept(tokens, scores(5), FloatArray(5), 320).isEmpty())
+    }
+
+    @Test fun growingTranscriptDoesNotDelayAnAlreadyStablePrefix() {
+        val matcher = StreamingCommandMatcher(defaultMappings(), revisable = true)
+        matcher.accept(listOf(" ONE"), scores(1), FloatArray(1), 0)
+        assertEquals(listOf("one"), matcher.accept(listOf(" ONE", " TWO"), scores(2), FloatArray(2), 160).map { it.word })
+        assertEquals(listOf("two"), matcher.accept(listOf(" ONE", " TWO", " THREE"), scores(3), FloatArray(3), 320).map { it.word })
+    }
+
+    @Test fun revisionOfCommittedOutputNeverReplaysKeysAndNextSegmentRecovers() {
+        val decisions = mutableListOf<RecognitionDecision>()
+        val matcher = StreamingCommandMatcher(defaultMappings(), revisable = true, onDecision = decisions::add)
+        assertEquals(1, matcher.accept(listOf(" ONE"), scores(1), FloatArray(1), 0, true).size)
+        assertTrue(matcher.accept(listOf(" TWO", " THREE"), scores(2), FloatArray(2), 160, true).isEmpty())
+        assertTrue(matcher.accept(listOf(" TWO", " THREE"), scores(2), FloatArray(2), 320, true).isEmpty())
+        assertEquals(1, decisions.count { it.reason == DecisionReason.REVISED_COMMITTED })
+        matcher.reset()
+        assertEquals(1, matcher.accept(listOf(" TWO"), scores(1), FloatArray(1), 480, true).size)
+    }
+
+    @Test fun diagnosticsExplainRejectedHomophonesWithoutForcingCommands() {
+        val decisions = mutableListOf<RecognitionDecision>()
+        val matcher = StreamingCommandMatcher(defaultMappings(), onDecision = decisions::add)
+        assertTrue(matcher.accept(listOf(" FOR", " PAWS"), scores(2), FloatArray(2), 0, true).isEmpty())
+        assertEquals(listOf("for", "paws"), decisions.map { it.word })
+        assertTrue(decisions.all { it.reason == DecisionReason.UNMAPPED })
+    }
+
+    @Test fun diagnosticsReportLowMissingAndInvalidScores() {
+        val decisions = mutableListOf<RecognitionDecision>()
+        val matcher = StreamingCommandMatcher(defaultMappings(), onDecision = decisions::add)
+        matcher.accept(listOf(" FOUR"), scores(1, -3f), FloatArray(1), 0, true)
+        assertEquals(DecisionReason.LOW_SCORE, decisions.single().reason)
+        assertEquals(0.15f, decisions.single().threshold!!, 0.001f)
+        matcher.reset(); decisions.clear()
+        matcher.accept(listOf(" PAUSE"), floatArrayOf(), FloatArray(1), 0, true)
+        assertEquals(DecisionReason.MISSING_SCORE, decisions.single().reason)
+        matcher.reset(); decisions.clear()
+        matcher.accept(listOf(" STOP"), floatArrayOf(Float.NaN), FloatArray(1), 0, true)
+        assertEquals(DecisionReason.INVALID_SCORE, decisions.single().reason)
+    }
+
+    @Test fun lowScoreFinalWordCanRecoverWithoutDuplicateRejectionRows() {
+        val decisions = mutableListOf<RecognitionDecision>()
+        val matcher = StreamingCommandMatcher(defaultMappings(), revisable = true, onDecision = decisions::add)
+        val tokens = listOf(" PAUSE")
+        matcher.accept(tokens, scores(1, -3f), FloatArray(1), 0)
+        matcher.accept(tokens, scores(1, -3f), FloatArray(1), 160)
+        matcher.accept(tokens, scores(1, -3f), FloatArray(1), 320)
+        assertEquals(1, decisions.size)
+        assertEquals(1, matcher.accept(tokens, scores(1), FloatArray(1), 480).size)
+        assertEquals(listOf(DecisionReason.LOW_SCORE, DecisionReason.ACCEPTED), decisions.map { it.reason })
+    }
 }

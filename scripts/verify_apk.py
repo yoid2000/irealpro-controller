@@ -12,7 +12,7 @@ def main():
     checked = 0
     with zipfile.ZipFile(args.apk) as apk:
         names = set(apk.namelist())
-        for model in ("encoder.onnx", "decoder.onnx", "joiner.onnx", "tokens.txt"):
+        for model in ("encoder.onnx", "decoder.onnx", "joiner.onnx", "tokens.txt", "bpe.vocab"):
             assert f"assets/kws/{model}" in names, f"Missing offline asset: {model}"
         for name in names:
             if not name.startswith("lib/") or not name.endswith(".so"):

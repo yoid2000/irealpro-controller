@@ -11,8 +11,9 @@ android {
         applicationId = "com.paul.voicekeys"
         minSdk = 31
         targetSdk = 36
-        versionCode = 5
-        versionName = "0.1.4"
+        versionCode = 7
+        versionName = "0.3.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk {
             abiFilters += "arm64-v8a"
             if (providers.gradleProperty("includeEmulator").orNull == "true") abiFilters += "x86_64"
@@ -27,6 +28,7 @@ android {
     androidResources { noCompress += listOf("onnx", "model") }
     packaging { jniLibs.useLegacyPackaging = false }
     sourceSets["test"].resources.srcDir("src/main/assets")
+    sourceSets["test"].resources.srcDir("src/androidTest/assets")
     lint { abortOnError = true }
 }
 
@@ -41,11 +43,13 @@ dependencies {
     testImplementation("org.robolectric:robolectric:4.14.1")
     testImplementation("org.mockito.kotlin:mockito-kotlin:5.4.0")
     testImplementation("org.mockito:mockito-core:5.17.0")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
 }
 
 val checkOfflineAssets by tasks.registering {
     doLast {
-        val required = listOf("encoder.onnx", "decoder.onnx", "joiner.onnx", "tokens.txt")
+        val required = listOf("encoder.onnx", "decoder.onnx", "joiner.onnx", "tokens.txt", "bpe.vocab")
         check(required.all { file("src/main/assets/kws/$it").isFile } &&
             file("libs/sherpa-onnx-2.0.1.aar").isFile) {
             "Offline recognition files are missing. Run: python scripts/prepare_assets.py (from the repository root)."
